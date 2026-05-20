@@ -1,28 +1,32 @@
 from flask import Flask, render_template, request, redirect
 import sqlite3
+import os
 
 app = Flask(__name__)
 
+# ---------- DATABASE INITIALIZATION ----------
 def init_db():
     conn = sqlite3.connect('fraud.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS transactions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 amount REAL,
-                 location TEXT,
-                 risk_score REAL,
-                 status TEXT)''')
+                  amount REAL,
+                  location TEXT,
+                  risk_score REAL,
+                  status TEXT)''')
     conn.commit()
     conn.close()
 
+# ---------- FRAUD RISK LOGIC ----------
 def calculate_risk(amount, location):
     risk = 0
     if amount > 50000:
-        risk += 40
+        risk += 50
     if location.lower() != "kanpur":
         risk += 30
     return risk
 
+# ---------- ROUTES ----------
 @app.route('/')
 def login():
     return render_template('login.html')
@@ -32,12 +36,13 @@ def transaction():
     if request.method == 'POST':
         amount = float(request.form['amount'])
         location = request.form['location']
+
         risk = calculate_risk(amount, location)
-        status = "Fraud" if risk > 60 else "Safe"
+        status = "Fraud" if risk >= 60 else "Safe"
 
         conn = sqlite3.connect('fraud.db')
         c = conn.cursor()
-        c.execute("INSERT INTO transactions (amount, location, risk_score, status) VALUES (?,?,?,?)",
+        c.execute("INSERT INTO transactions (amount, location, risk_score, status) VALUES (?, ?, ?, ?)",
                   (amount, location, risk, status))
         conn.commit()
         conn.close()
@@ -64,6 +69,8 @@ def alerts():
     conn.close()
     return render_template('alerts.html', data=data)
 
+# ---------- MAIN ----------
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
